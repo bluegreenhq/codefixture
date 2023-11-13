@@ -7,19 +7,17 @@ import (
 )
 
 type FixtureBuilder struct {
-	Constructors map[reflect.Type]func() any
-	Writers      map[reflect.Type]func(m any) (any, error)
-	InModels     map[ModelRef]any
-	OutModels    map[ModelRef]any
-	Relations    []ModelRelation
+	constructors map[reflect.Type]func() any
+	writers      map[reflect.Type]func(m any) (any, error)
+	models       map[ModelRef]any
+	relations    []ModelRelation
 }
 
 func NewFixtureBuilder() *FixtureBuilder {
 	return &FixtureBuilder{
-		Constructors: map[reflect.Type]func() any{},
-		Writers:      make(map[reflect.Type]func(m any) (any, error)),
-		InModels:     make(map[ModelRef]any),
-		OutModels:    make(map[ModelRef]any),
+		constructors: map[reflect.Type]func() any{},
+		writers:      make(map[reflect.Type]func(m any) (any, error)),
+		models:       make(map[ModelRef]any),
 	}
 }
 
@@ -29,7 +27,7 @@ func RegisterWriter[T any](b *FixtureBuilder, f func(m T) (T, error)) error {
 		return fmt.Errorf("type %v is not a pointer", ptrType)
 	}
 
-	b.Writers[ptrType] = func(m any) (any, error) {
+	b.writers[ptrType] = func(m any) (any, error) {
 		switch m := m.(type) {
 		case T:
 			return f(m)
@@ -47,7 +45,7 @@ func RegisterConstructor[T any](b *FixtureBuilder, constructor func() T) error {
 		return fmt.Errorf("type %v is not a pointer", ptrType)
 	}
 
-	b.Constructors[ptrType] = func() any {
+	b.constructors[ptrType] = func() any {
 		return constructor()
 	}
 
@@ -68,7 +66,7 @@ func AddModel[T any](b *FixtureBuilder, setter func(T)) (ModelRef, error) {
 	ref := NewModelRef()
 	var m any
 
-	contructor := b.Constructors[ptrType]
+	contructor := b.constructors[ptrType]
 	if contructor == nil {
 		m = reflect.New(structType).Interface()
 	} else {
@@ -84,12 +82,12 @@ func AddModel[T any](b *FixtureBuilder, setter func(T)) (ModelRef, error) {
 		}
 	}
 
-	b.InModels[ref] = m
+	b.models[ref] = m
 	return ref, nil
 }
 
 func AddRelation[T any, U any](b *FixtureBuilder, target ModelRef, foreign ModelRef, connector func(T, U)) {
-	b.Relations = append(b.Relations, ModelRelation{
+	b.relations = append(b.relations, ModelRelation{
 		TargetRef:  target,
 		ForeignRef: foreign,
 		Connector: func(target, dependent any) {
@@ -98,56 +96,50 @@ func AddRelation[T any, U any](b *FixtureBuilder, target ModelRef, foreign Model
 	})
 }
 
-func (b *FixtureBuilder) Build() error {
-	refs, inModels := b.getInModelsOrderedByRelations()
+func (b *FixtureBuilder) GetModel(ref ModelRef) any {
+	return b.models[ref]
+}
+
+func (b *FixtureBuilder) Build() (*Fixture, error) {
+	f := NewFixture()
+	refs, inModels := b.getModelsOrderedByRelations()
 
 	for i, ref := range refs {
 		inModel := inModels[i]
 
-		for _, relation := range b.Relations {
+		for _, relation := range b.relations {
 			if relation.TargetRef != ref {
 				continue
 			}
-			foreignModel, ok := b.OutModels[relation.ForeignRef]
-			if !ok {
-				return fmt.Errorf("model ref %s is not found", relation.ForeignRef)
+			foreignModel := f.GetModel(relation.ForeignRef)
+			if foreignModel == nil {
+				return nil, fmt.Errorf("model ref %s is not found", relation.ForeignRef)
 			}
 			relation.Connector(inModel, foreignModel)
 		}
 
 		typ := reflect.TypeOf(inModel)
-		writer, ok := b.Writers[typ]
+		writer, ok := b.writers[typ]
 		if !ok {
-			return fmt.Errorf("writer for %T is not found", inModel)
+			return nil, fmt.Errorf("writer for %T is not found", inModel)
 		}
 
 		outModel, err := writer(inModel)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		b.OutModels[ref] = outModel
+		f.SetModel(ref, outModel)
 	}
 
-	return nil
+	return f, nil
 }
 
-func GetModels[T any](b *FixtureBuilder) []T {
-	var models []T
-	for _, m := range b.OutModels {
-		switch m := m.(type) {
-		case T:
-			models = append(models, m)
-		}
-	}
-	return models
-}
-
-// getInModelsOrderedByRelations returns a slice of ModelRef and a slice of models
+// getModelsOrderedByRelations returns a slice of ModelRef and a slice of models
 // ordered based on their hierarchical depth as defined in Relations.
-func (ib *FixtureBuilder) getInModelsOrderedByRelations() ([]ModelRef, []any) {
+func (ib *FixtureBuilder) getModelsOrderedByRelations() ([]ModelRef, []any) {
 	// Initialize depths for each model in InModels
 	depths := make(map[ModelRef]int)
-	for ref := range ib.InModels {
+	for ref := range ib.models {
 		depths[ref] = 0
 	}
 
@@ -155,7 +147,7 @@ func (ib *FixtureBuilder) getInModelsOrderedByRelations() ([]ModelRef, []any) {
 	changed := true
 	for changed {
 		changed = false
-		for _, relation := range ib.Relations {
+		for _, relation := range ib.relations {
 			targetDepth := depths[relation.TargetRef]
 			foreignDepth := depths[relation.ForeignRef]
 
@@ -177,8 +169,8 @@ func (ib *FixtureBuilder) getInModelsOrderedByRelations() ([]ModelRef, []any) {
 	}
 
 	var modelsWithDepth []modelWithDepth
-	for ref, model := range ib.InModels {
-		modelsWithDepth = append(modelsWithDepth, modelWithDepth{ref, depths[ref], model})
+	for ref, m := range ib.models {
+		modelsWithDepth = append(modelsWithDepth, modelWithDepth{ref, depths[ref], m})
 	}
 
 	// Sort models based on depth
@@ -189,9 +181,9 @@ func (ib *FixtureBuilder) getInModelsOrderedByRelations() ([]ModelRef, []any) {
 	// Prepare the final sorted results
 	var orderedRefs []ModelRef
 	var orderedModels []any
-	for _, mwd := range modelsWithDepth {
-		orderedRefs = append(orderedRefs, mwd.ref)
-		orderedModels = append(orderedModels, mwd.model)
+	for _, m := range modelsWithDepth {
+		orderedRefs = append(orderedRefs, m.ref)
+		orderedModels = append(orderedModels, m.model)
 	}
 
 	return orderedRefs, orderedModels
