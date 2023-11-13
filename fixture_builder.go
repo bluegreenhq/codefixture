@@ -7,7 +7,7 @@ import (
 )
 
 type FixtureBuilder struct {
-	Constructors map[reflect.Type]func(func(any)) any
+	Constructors map[reflect.Type]func() any
 	Writers      map[reflect.Type]func(m any) (any, error)
 	InModels     map[ModelRef]any
 	OutModels    map[ModelRef]any
@@ -16,7 +16,7 @@ type FixtureBuilder struct {
 
 func NewFixtureBuilder() *FixtureBuilder {
 	return &FixtureBuilder{
-		Constructors: map[reflect.Type]func(func(any)) any{},
+		Constructors: map[reflect.Type]func() any{},
 		Writers:      make(map[reflect.Type]func(m any) (any, error)),
 		InModels:     make(map[ModelRef]any),
 		OutModels:    make(map[ModelRef]any),
@@ -41,16 +41,14 @@ func RegisterWriter[T any](b *FixtureBuilder, f func(m T) (T, error)) error {
 	return nil
 }
 
-func RegisterConstructor[T any](b *FixtureBuilder, constructor func(func(T)) T) error {
+func RegisterConstructor[T any](b *FixtureBuilder, constructor func() T) error {
 	ptrType := reflect.TypeOf((*T)(nil)).Elem()
 	if ptrType.Kind() != reflect.Ptr {
 		return fmt.Errorf("type %v is not a pointer", ptrType)
 	}
 
-	b.Constructors[ptrType] = func(setter func(any)) any {
-		return constructor(func(m T) {
-			setter(m)
-		})
+	b.Constructors[ptrType] = func() any {
+		return constructor()
 	}
 
 	return nil
@@ -68,31 +66,24 @@ func AddModel[T any](b *FixtureBuilder, setter func(T)) (ModelRef, error) {
 	}
 
 	ref := NewModelRef()
-	contructor := b.Constructors[ptrType]
 	var m any
+
+	contructor := b.Constructors[ptrType]
 	if contructor == nil {
 		m = reflect.New(structType).Interface()
-		if setter != nil {
-			switch m := m.(type) {
-			case T:
-				setter(m)
-			default:
-				panic(fmt.Sprintf("invalid type: %T", m))
-			}
-		}
-
 	} else {
-		m = contructor(func(m any) {
-			if setter != nil {
-				switch m := m.(type) {
-				case T:
-					setter(m)
-				default:
-					panic(fmt.Sprintf("invalid type: %T", m))
-				}
-			}
-		})
+		m = contructor()
 	}
+
+	if setter != nil {
+		switch m := m.(type) {
+		case T:
+			setter(m)
+		default:
+			panic(fmt.Sprintf("invalid type: %T", m))
+		}
+	}
+
 	b.InModels[ref] = m
 	return ref, nil
 }

@@ -6,6 +6,41 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type Person struct {
+	Name string
+}
+
+func TestRegisterConstructor(t *testing.T) {
+	t.Run("set default value", func(t *testing.T) {
+		b := NewFixtureBuilder()
+		err := RegisterConstructor[*Person](b, func() *Person {
+			return &Person{Name: "default"}
+		})
+		assert.NoError(t, err)
+
+		AddModel[*Person](b, func(p *Person) {
+			assert.Equal(t, "default", p.Name)
+		})
+	})
+}
+
+func TestAddModel(t *testing.T) {
+	t.Run("override value by setter", func(t *testing.T) {
+		b := NewFixtureBuilder()
+		err := RegisterConstructor[*Person](b, func() *Person {
+			return &Person{Name: "default"}
+		})
+		assert.NoError(t, err)
+
+		ref, err := AddModel[*Person](b, func(p *Person) {
+			p.Name = "override"
+		})
+		assert.NoError(t, err)
+
+		assert.Equal(t, "override", b.InModels[ref].(*Person).Name)
+	})
+}
+
 func TestFixtureBuilder_getInModelsOrderedByRelations(t *testing.T) {
 	t.Run("no relations", func(t *testing.T) {
 		b := NewFixtureBuilder()
