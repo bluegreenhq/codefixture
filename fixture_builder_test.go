@@ -91,4 +91,35 @@ func TestFixtureBuilder_getInModelsOrderedByRelations(t *testing.T) {
 		assert.Equal(t, "branch", ms[1])
 		assert.Equal(t, "root", ms[2])
 	})
+	t.Run("delayed dependency resolution", func(t *testing.T) {
+		b := NewFixtureBuilder()
+		b.InModels["d"] = "d"
+		b.InModels["c"] = "c"
+		b.InModels["b"] = "b"
+		b.InModels["a"] = "a"
+
+		b.Relations = []ModelRelation{
+			{
+				TargetRef:  "b",
+				ForeignRef: "a",
+			},
+			{
+				TargetRef:  "c",
+				ForeignRef: "b",
+			},
+			{
+				TargetRef:  "d",
+				ForeignRef: "a",
+			},
+			{
+				TargetRef:  "d",
+				ForeignRef: "c",
+			},
+		}
+
+		refs, ms := b.getInModelsOrderedByRelations()
+		assert.Len(t, refs, 4)
+		assert.Len(t, ms, 4)
+		assert.Equal(t, []any{"a", "b", "c", "d"}, ms)
+	})
 }

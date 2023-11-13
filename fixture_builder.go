@@ -152,13 +152,19 @@ func (ib *FixtureBuilder) getInModelsOrderedByRelations() ([]ModelRef, []any) {
 	}
 
 	// Update depths based on Relations
-	for _, relation := range ib.Relations {
-		targetDepth, targetExists := depths[relation.TargetRef]
-		foreignDepth, foreignExists := depths[relation.ForeignRef]
+	changed := true
+	for changed {
+		changed = false
+		for _, relation := range ib.Relations {
+			targetDepth := depths[relation.TargetRef]
+			foreignDepth := depths[relation.ForeignRef]
 
-		if targetExists && foreignExists {
 			if targetDepth >= foreignDepth {
-				depths[relation.ForeignRef] = targetDepth + 1
+				newDepth := targetDepth + 1
+				if newDepth > depths[relation.ForeignRef] {
+					depths[relation.ForeignRef] = newDepth
+					changed = true
+				}
 			}
 		}
 	}
