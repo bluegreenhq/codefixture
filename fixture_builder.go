@@ -101,18 +101,18 @@ func AddRelation[T any, U any](b *FixtureBuilder, target ModelRef, foreign Model
 func (b *FixtureBuilder) Build() error {
 	refs, inModels := b.getInModelsOrderedByRelations()
 
-	for i, modelAlias := range refs {
+	for i, ref := range refs {
 		inModel := inModels[i]
 
 		for _, relation := range b.Relations {
-			if relation.TargetRef != modelAlias {
+			if relation.TargetRef != ref {
 				continue
 			}
-			dstModel, ok := b.OutModels[relation.ForeignRef]
+			foreignModel, ok := b.OutModels[relation.ForeignRef]
 			if !ok {
-				return fmt.Errorf("model alias %s is not found", relation.ForeignRef)
+				return fmt.Errorf("model ref %s is not found", relation.ForeignRef)
 			}
-			relation.Connector(inModel, dstModel)
+			relation.Connector(inModel, foreignModel)
 		}
 
 		typ := reflect.TypeOf(inModel)
@@ -125,7 +125,7 @@ func (b *FixtureBuilder) Build() error {
 		if err != nil {
 			return err
 		}
-		b.OutModels[modelAlias] = outModel
+		b.OutModels[ref] = outModel
 	}
 
 	return nil

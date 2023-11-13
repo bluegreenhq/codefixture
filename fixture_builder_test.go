@@ -25,6 +25,23 @@ func TestRegisterConstructor(t *testing.T) {
 }
 
 func TestAddModel(t *testing.T) {
+	t.Run("no setter, has constructor", func(t *testing.T) {
+		b := NewFixtureBuilder()
+		err := RegisterConstructor[*Person](b, func() *Person {
+			return &Person{Name: "default"}
+		})
+		assert.NoError(t, err)
+
+		ref, err := AddModel[*Person](b, nil)
+		assert.NoError(t, err)
+		assert.Equal(t, "default", b.InModels[ref].(*Person).Name)
+	})
+	t.Run("no setter, no constructor", func(t *testing.T) {
+		b := NewFixtureBuilder()
+		ref, err := AddModel[*Person](b, nil)
+		assert.NoError(t, err)
+		assert.Zero(t, b.InModels[ref].(*Person).Name)
+	})
 	t.Run("override value by setter", func(t *testing.T) {
 		b := NewFixtureBuilder()
 		err := RegisterConstructor[*Person](b, func() *Person {
