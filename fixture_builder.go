@@ -7,93 +7,47 @@ import (
 )
 
 type FixtureBuilder struct {
-	constructors map[reflect.Type]func() any
-	writers      map[reflect.Type]func(m any) (any, error)
+	constructors map[reflect.Type]Constructor
+	writers      map[reflect.Type]Writer
 	models       map[ModelRef]any
 	relations    []ModelRelation
 }
 
+type Constructor func() any
+type Setter func(any)
+type Writer func(m any) (any, error)
+
 func NewFixtureBuilder() *FixtureBuilder {
 	return &FixtureBuilder{
-		constructors: map[reflect.Type]func() any{},
-		writers:      make(map[reflect.Type]func(m any) (any, error)),
+		constructors: make(map[reflect.Type]Constructor),
+		writers:      make(map[reflect.Type]Writer),
 		models:       make(map[ModelRef]any),
 	}
 }
 
-func RegisterWriter[T any](b *FixtureBuilder, f func(m T) (T, error)) error {
-	ptrType := reflect.TypeOf((*T)(nil)).Elem()
-	if ptrType.Kind() != reflect.Ptr {
-		return fmt.Errorf("type %v is not a pointer", ptrType)
-	}
+func (b *FixtureBuilder) RegisterWriter(typeInstance any, writer Writer) error {
+	ptrType := reflect.TypeOf(typeInstance)
 
-	b.writers[ptrType] = func(m any) (any, error) {
-		switch m := m.(type) {
-		case T:
-			return f(m)
-		default:
-			return nil, fmt.Errorf("invalid type: %T", m)
-		}
-	}
-
-	return nil
+	return b.registerWriter(ptrType, writer)
 }
 
-func RegisterConstructor[T any](b *FixtureBuilder, constructor func() T) error {
-	ptrType := reflect.TypeOf((*T)(nil)).Elem()
-	if ptrType.Kind() != reflect.Ptr {
-		return fmt.Errorf("type %v is not a pointer", ptrType)
-	}
+func (b *FixtureBuilder) RegisterConstructor(typeInstance any, constructor Constructor) error {
+	ptrType := reflect.TypeOf(typeInstance)
 
-	b.constructors[ptrType] = func() any {
-		return constructor()
-	}
-
-	return nil
+	return b.registerConstructor(ptrType, constructor)
 }
 
-func AddModel[T any](b *FixtureBuilder, setter func(T)) (ModelRef, error) {
-	ptrType := reflect.TypeOf((*T)(nil)).Elem()
+func (b *FixtureBuilder) AddModel(typeInstance any, setter Setter) (ModelRef, error) {
+	ptrType := reflect.TypeOf(typeInstance)
 	if ptrType.Kind() != reflect.Ptr {
 		return "", fmt.Errorf("type %v is not a pointer", ptrType)
 	}
 
-	structType := ptrType.Elem()
-	if structType.Kind() != reflect.Struct {
-		return "", fmt.Errorf("type %v is not a struct", structType)
-	}
-
-	ref := NewModelRef()
-	var m any
-
-	contructor := b.constructors[ptrType]
-	if contructor == nil {
-		m = reflect.New(structType).Interface()
-	} else {
-		m = contructor()
-	}
-
-	if setter != nil {
-		switch m := m.(type) {
-		case T:
-			setter(m)
-		default:
-			panic(fmt.Sprintf("invalid type: %T", m))
-		}
-	}
-
-	b.models[ref] = m
-	return ref, nil
+	return b.addModel(ptrType, setter)
 }
 
-func AddRelation[T any, U any](b *FixtureBuilder, target ModelRef, foreign ModelRef, connector func(T, U)) {
-	b.relations = append(b.relations, ModelRelation{
-		TargetRef:  target,
-		ForeignRef: foreign,
-		Connector: func(target, dependent any) {
-			connector(target.(T), dependent.(U))
-		},
-	})
+func (b *FixtureBuilder) AddRelation(target ModelRef, foreign ModelRef, connector Connector) error {
+	return b.addRelation(target, foreign, connector)
 }
 
 func (b *FixtureBuilder) GetModel(ref ModelRef) any {
@@ -119,19 +73,81 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 		}
 
 		typ := reflect.TypeOf(inModel)
-		writer, ok := b.writers[typ]
-		if !ok {
-			return nil, fmt.Errorf("writer for %T is not found", inModel)
+		writer := b.writers[typ]
+		model := inModel
+
+		if writer != nil {
+			outModel, err := writer(inModel)
+			if err != nil {
+				return nil, err
+			}
+			model = outModel
 		}
 
-		outModel, err := writer(inModel)
-		if err != nil {
-			return nil, err
-		}
-		f.SetModel(ref, outModel)
+		f.SetModel(ref, model)
 	}
 
 	return f, nil
+}
+
+func (b *FixtureBuilder) registerWriter(ptrType reflect.Type, writer Writer) error {
+	if ptrType.Kind() != reflect.Ptr {
+		return fmt.Errorf("type %v is not a pointer", ptrType)
+	}
+
+	b.writers[ptrType] = writer
+	return nil
+}
+
+func (b *FixtureBuilder) registerConstructor(ptrType reflect.Type, constructor Constructor) error {
+	if ptrType.Kind() != reflect.Ptr {
+		return fmt.Errorf("type %v is not a pointer", ptrType)
+	}
+
+	b.constructors[ptrType] = constructor
+	return nil
+}
+
+func (b *FixtureBuilder) addModel(ptrType reflect.Type, setter Setter) (ModelRef, error) {
+	structType := ptrType.Elem()
+	if structType.Kind() != reflect.Struct {
+		return "", fmt.Errorf("type %v is not a struct", structType)
+	}
+
+	ref := NewModelRef()
+	var m any
+
+	contructor := b.constructors[ptrType]
+	if contructor == nil {
+		m = reflect.New(structType).Interface()
+	} else {
+		m = contructor()
+	}
+
+	if setter != nil {
+		setter(m)
+	}
+
+	b.models[ref] = m
+	return ref, nil
+}
+
+func (b *FixtureBuilder) addRelation(target ModelRef, foreign ModelRef, connector Connector) error {
+	targetModel := b.GetModel(target)
+	if targetModel == nil {
+		return fmt.Errorf("target model ref %s is not found", target)
+	}
+	foreignModel := b.GetModel(foreign)
+	if foreignModel == nil {
+		return fmt.Errorf("foreign model ref %s is not found", foreign)
+	}
+
+	b.relations = append(b.relations, ModelRelation{
+		TargetRef:  target,
+		ForeignRef: foreign,
+		Connector:  connector,
+	})
+	return nil
 }
 
 // getModelsOrderedByRelations returns a slice of ModelRef and a slice of models

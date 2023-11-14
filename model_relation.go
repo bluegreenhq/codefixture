@@ -3,5 +3,7 @@ package codefixture
 type ModelRelation struct {
 	TargetRef  ModelRef
 	ForeignRef ModelRef
-	Connector  func(target any, dependent any)
+	Connector  Connector
 }
+
+type Connector func(target any, foreign any)
