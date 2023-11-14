@@ -22,12 +22,8 @@ func TestFixtureBuilder_AddRelation(t *testing.T) {
 	t.Run("add relation", func(t *testing.T) {
 		b := codefixture.NewFixtureBuilder()
 
-		p, _ := b.AddModel(&Person{}, func(m any) {
-			m.(*Person).ID = 1
-		})
-		g, _ := b.AddModel(&Group{}, func(m any) {
-			m.(*Group).ID = 2
-		})
+		p, _ := b.AddModel(&Person{ID: 1})
+		g, _ := b.AddModel(&Group{ID: 2})
 
 		b.AddRelation(p, g, func(p, g any) {
 			p.(*Person).GroupID = g.(*Group).ID

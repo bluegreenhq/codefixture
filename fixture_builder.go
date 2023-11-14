@@ -37,7 +37,18 @@ func (b *FixtureBuilder) RegisterConstructor(typeInstance any, constructor Const
 	return b.registerConstructor(ptrType, constructor)
 }
 
-func (b *FixtureBuilder) AddModel(typeInstance any, setter Setter) (ModelRef, error) {
+func (b *FixtureBuilder) AddModel(m any) (ModelRef, error) {
+	ptrType := reflect.TypeOf(m)
+	if ptrType.Kind() != reflect.Ptr {
+		return "", fmt.Errorf("type %v is not a pointer", ptrType)
+	}
+
+	ref := NewModelRef()
+	b.models[ref] = m
+	return ref, nil
+}
+
+func (b *FixtureBuilder) AddModelBySetter(typeInstance any, setter Setter) (ModelRef, error) {
 	ptrType := reflect.TypeOf(typeInstance)
 	if ptrType.Kind() != reflect.Ptr {
 		return "", fmt.Errorf("type %v is not a pointer", ptrType)
