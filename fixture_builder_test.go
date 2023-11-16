@@ -18,6 +18,19 @@ type Group struct {
 	Name string
 }
 
+func TestFixtureBuilder_WithMode(t *testing.T) {
+	t.Run("add multiple models", func(t *testing.T) {
+		f, err := codefixture.NewFixtureBuilder().
+			WithModel(&Person{Name: "john"}, "p1").
+			WithModel(&Group{Name: "family"}, "g1").
+			Build()
+
+		assert.NoError(t, err)
+		assert.Equal(t, "john", f.GetModel("p1").(*Person).Name)
+		assert.Equal(t, "family", f.GetModel("g1").(*Group).Name)
+	})
+}
+
 func TestFixtureBuilder_AddRelation(t *testing.T) {
 	t.Run("add relation", func(t *testing.T) {
 		b := codefixture.NewFixtureBuilder()

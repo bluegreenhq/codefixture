@@ -1,7 +1,6 @@
 package codefixture
 
 import (
-	"fmt"
 	"reflect"
 	"sort"
 )
@@ -40,7 +39,7 @@ func (b *FixtureBuilder) RegisterConstructor(typeInstance any, constructor Const
 func (b *FixtureBuilder) AddModel(m any) (ModelRef, error) {
 	ptrType := reflect.TypeOf(m)
 	if ptrType.Kind() != reflect.Ptr {
-		return "", fmt.Errorf("type %v is not a pointer", ptrType)
+		return "", NewNotPointerError(ptrType)
 	}
 
 	ref := NewModelRef()
@@ -48,10 +47,21 @@ func (b *FixtureBuilder) AddModel(m any) (ModelRef, error) {
 	return ref, nil
 }
 
+func (b *FixtureBuilder) WithModel(m any, ref ModelRef) *FixtureBuilder {
+	ptrType := reflect.TypeOf(m)
+	if ptrType.Kind() != reflect.Ptr {
+		err := NewNotPointerError(ptrType)
+		panic(err)
+	}
+
+	b.models[ref] = m
+	return b
+}
+
 func (b *FixtureBuilder) AddModelBySetter(typeInstance any, setter Setter) (ModelRef, error) {
 	ptrType := reflect.TypeOf(typeInstance)
 	if ptrType.Kind() != reflect.Ptr {
-		return "", fmt.Errorf("type %v is not a pointer", ptrType)
+		return "", NewNotPointerError(ptrType)
 	}
 
 	return b.addModel(ptrType, setter)
@@ -78,7 +88,7 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 			}
 			foreignModel := f.GetModel(relation.ForeignRef)
 			if foreignModel == nil {
-				return nil, fmt.Errorf("model ref %s is not found", relation.ForeignRef)
+				return nil, NewModelRefNotFoundError(relation.ForeignRef)
 			}
 			relation.Connector(inModel, foreignModel)
 		}
@@ -103,7 +113,7 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 
 func (b *FixtureBuilder) registerWriter(ptrType reflect.Type, writer Writer) error {
 	if ptrType.Kind() != reflect.Ptr {
-		return fmt.Errorf("type %v is not a pointer", ptrType)
+		return NewNotPointerError(ptrType)
 	}
 
 	b.writers[ptrType] = writer
@@ -112,7 +122,7 @@ func (b *FixtureBuilder) registerWriter(ptrType reflect.Type, writer Writer) err
 
 func (b *FixtureBuilder) registerConstructor(ptrType reflect.Type, constructor Constructor) error {
 	if ptrType.Kind() != reflect.Ptr {
-		return fmt.Errorf("type %v is not a pointer", ptrType)
+		return NewNotPointerError(ptrType)
 	}
 
 	b.constructors[ptrType] = constructor
@@ -122,7 +132,7 @@ func (b *FixtureBuilder) registerConstructor(ptrType reflect.Type, constructor C
 func (b *FixtureBuilder) addModel(ptrType reflect.Type, setter Setter) (ModelRef, error) {
 	structType := ptrType.Elem()
 	if structType.Kind() != reflect.Struct {
-		return "", fmt.Errorf("type %v is not a struct", structType)
+		return "", NewNotStructError(structType)
 	}
 
 	ref := NewModelRef()
@@ -146,11 +156,11 @@ func (b *FixtureBuilder) addModel(ptrType reflect.Type, setter Setter) (ModelRef
 func (b *FixtureBuilder) addRelation(target ModelRef, foreign ModelRef, connector Connector) error {
 	targetModel := b.GetModel(target)
 	if targetModel == nil {
-		return fmt.Errorf("target model ref %s is not found", target)
+		return NewModelRefNotFoundError(target)
 	}
 	foreignModel := b.GetModel(foreign)
 	if foreignModel == nil {
-		return fmt.Errorf("foreign model ref %s is not found", foreign)
+		return NewModelRefNotFoundError(foreign)
 	}
 
 	b.relations = append(b.relations, ModelRelation{
