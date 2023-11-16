@@ -29,13 +29,13 @@ func RegisterConstructor[T any](b *FixtureBuilder, constructor func() T) error {
 func AddModel[T any](b *FixtureBuilder, setter func(T)) (ModelRef, error) {
 	ptrType := reflect.TypeOf((*T)(nil)).Elem()
 	if ptrType.Kind() != reflect.Ptr {
-		return "", fmt.Errorf("type %v is not a pointer", ptrType)
+		return "", NewNotPointerError(ptrType)
 	}
 
 	return b.addModel(ptrType, func(m any) {
 		t, ok := m.(T)
 		if !ok {
-			panic(fmt.Sprintf("invalid type: %T", m))
+			panic(NewInvalidTypeError(m))
 		}
 
 		if setter != nil {
@@ -48,15 +48,26 @@ func AddRelation[T any, U any](b *FixtureBuilder, target ModelRef, foreign Model
 	return b.addRelation(target, foreign, func(target, foreign any) {
 		t, ok := target.(T)
 		if !ok {
-			panic(fmt.Sprintf("invalid type: %T", target))
+			panic(NewInvalidTypeError(target))
 		}
 		u, ok := foreign.(U)
 		if !ok {
-			panic(fmt.Sprintf("invalid type: %T", target))
+			panic(NewInvalidTypeError(foreign))
 		}
 
 		if connector != nil {
 			connector(t, u)
 		}
 	})
+}
+
+func GetModel[T any](b *FixtureBuilder, ref ModelRef) T {
+	m := b.models[ref]
+
+	t, ok := m.(T)
+	if !ok {
+		panic(NewInvalidTypeError(m))
+	}
+
+	return t
 }
