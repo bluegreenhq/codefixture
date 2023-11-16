@@ -32,7 +32,7 @@ func TestAddModel(t *testing.T) {
 		ref, err := codefixture.AddModel[*Person](b, nil)
 		assert.NoError(t, err)
 
-		m := codefixture.GetModel[*Person](b, ref)
+		m := codefixture.GetBuilderModel[*Person](b, ref)
 		assert.Equal(t, "default", m.Name)
 	})
 	t.Run("no setter, no constructor", func(t *testing.T) {
@@ -40,7 +40,7 @@ func TestAddModel(t *testing.T) {
 		ref, err := codefixture.AddModel[*Person](b, nil)
 		assert.NoError(t, err)
 
-		m := codefixture.GetModel[*Person](b, ref)
+		m := codefixture.GetBuilderModel[*Person](b, ref)
 		assert.Zero(t, m.Name)
 	})
 	t.Run("override value by setter", func(t *testing.T) {
@@ -55,7 +55,7 @@ func TestAddModel(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		m := codefixture.GetModel[*Person](b, ref)
+		m := codefixture.GetBuilderModel[*Person](b, ref)
 		assert.Equal(t, "override", m.Name)
 	})
 }

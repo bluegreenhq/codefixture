@@ -61,7 +61,7 @@ func AddRelation[T any, U any](b *FixtureBuilder, target ModelRef, foreign Model
 	})
 }
 
-func GetModel[T any](b *FixtureBuilder, ref ModelRef) T {
+func GetBuilderModel[T any](b *FixtureBuilder, ref ModelRef) T {
 	m := b.models[ref]
 
 	t, ok := m.(T)

@@ -17,14 +17,3 @@ func (f *Fixture) GetModel(ref ModelRef) any {
 func (f *Fixture) SetModel(ref ModelRef, m any) {
 	f.models[ref] = m
 }
-
-func GetModels[T any](f *Fixture) []T {
-	var models []T
-	for _, m := range f.models {
-		switch m := m.(type) {
-		case T:
-			models = append(models, m)
-		}
-	}
-	return models
-}
