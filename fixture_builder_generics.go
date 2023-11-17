@@ -52,23 +52,17 @@ func AddModelWithRelation[T, U any](b *FixtureBuilder, foreign TypedModelRef[U],
 		return "", NewNotPointerError(ptrType)
 	}
 
-	ref, err := b.addModel(ptrType, func(m any) {
-		t, ok := m.(T)
-		if !ok {
-			panic(NewInvalidTypeError(m))
-		}
+	target, err := AddModel[T](b, nil)
+	if err != nil {
+		return "", err
+	}
 
-		u := GetBuilderModel(b, foreign)
-		if !ok {
-			panic(NewInvalidTypeError(u))
-		}
+	err = AddRelation[T, U](b, target, foreign, connector)
+	if err != nil {
+		return "", err
+	}
 
-		if connector != nil {
-			connector(t, u)
-		}
-	})
-
-	return TypedModelRef[T](ref), err
+	return target, nil
 }
 
 func ConvertAndAddModel[T, U any](b *FixtureBuilder, setter func(T)) (TypedModelRef[U], error) {
