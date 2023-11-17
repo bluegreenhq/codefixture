@@ -79,7 +79,7 @@ func (b *FixtureBuilder) WithRelation(target ModelRef, foreign ModelRef, connect
 	return b
 }
 
-func (b *FixtureBuilder) GetModel(ref ModelRef) any {
+func (b *FixtureBuilder) GetBuilderModel(ref ModelRef) any {
 	return b.models[ref]
 }
 
@@ -162,11 +162,11 @@ func (b *FixtureBuilder) addModel(ptrType reflect.Type, setter Setter) (ModelRef
 }
 
 func (b *FixtureBuilder) addRelation(target ModelRef, foreign ModelRef, connector Connector) error {
-	targetModel := b.GetModel(target)
+	targetModel := b.GetBuilderModel(target)
 	if targetModel == nil {
 		return NewModelRefNotFoundError(target)
 	}
-	foreignModel := b.GetModel(foreign)
+	foreignModel := b.GetBuilderModel(foreign)
 	if foreignModel == nil {
 		return NewModelRefNotFoundError(foreign)
 	}

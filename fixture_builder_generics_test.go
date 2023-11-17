@@ -81,3 +81,19 @@ func TestAddModel(t *testing.T) {
 		assert.Equal(t, "override", m.Name)
 	})
 }
+
+func TestGetBuilderModel(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		b := codefixture.NewFixtureBuilder()
+		err := codefixture.RegisterConstructor(b, func() *Person {
+			return &Person{Name: "default"}
+		})
+		assert.NoError(t, err)
+
+		ref, err := codefixture.AddModel[*Person](b, nil)
+		assert.NoError(t, err)
+
+		m := codefixture.GetBuilderModel(b, ref)
+		assert.Equal(t, "default", m.Name)
+	})
+}
