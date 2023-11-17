@@ -78,7 +78,13 @@ func (b *FixtureBuilder) AddModelBySetter(typeInstance any, setter Setter) (Mode
 		return "", NewNotPointerError(ptrType)
 	}
 
-	return b.addModel(ptrType, setter)
+	ref := NewModelRef()
+	err := b.addModel(ptrType, ref, setter)
+	if err != nil {
+		return "", err
+	}
+
+	return ref, nil
 }
 
 func (b *FixtureBuilder) AddRelation(target ModelRef, foreign ModelRef, connector Connector) error {
@@ -104,17 +110,6 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 	for i, ref := range refs {
 		inModel := inModels[i]
 
-		for _, relation := range b.relations {
-			if relation.TargetRef != ref {
-				continue
-			}
-			foreignModel := f.GetModel(relation.ForeignRef)
-			if foreignModel == nil {
-				return nil, NewModelRefNotFoundError(relation.ForeignRef)
-			}
-			relation.Connector(inModel, foreignModel)
-		}
-
 		typ := reflect.TypeOf(inModel)
 		writer := b.writers[typ]
 		model := inModel
@@ -123,6 +118,16 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 			outModel, err := writer(inModel)
 			if err != nil {
 				return nil, err
+			}
+			for _, relation := range b.relations {
+				if relation.TargetRef != ref {
+					continue
+				}
+				foreignModel := f.GetModel(relation.ForeignRef)
+				if foreignModel == nil {
+					return nil, NewModelRefNotFoundError(relation.ForeignRef)
+				}
+				relation.Connector(outModel, foreignModel)
 			}
 			model = outModel
 		} else {
@@ -155,15 +160,13 @@ func (b *FixtureBuilder) registerConstructor(ptrType reflect.Type, constructor C
 	return nil
 }
 
-func (b *FixtureBuilder) addModel(ptrType reflect.Type, setter Setter) (ModelRef, error) {
+func (b *FixtureBuilder) addModel(ptrType reflect.Type, ref ModelRef, setter Setter) error {
 	structType := ptrType.Elem()
 	if structType.Kind() != reflect.Struct {
-		return "", NewNotStructError(structType)
+		return NewNotStructError(structType)
 	}
 
-	ref := NewModelRef()
 	var m any
-
 	contructor := b.constructors[ptrType]
 	if contructor == nil {
 		m = reflect.New(structType).Interface()
@@ -176,7 +179,7 @@ func (b *FixtureBuilder) addModel(ptrType reflect.Type, setter Setter) (ModelRef
 	}
 
 	b.models[ref] = m
-	return ref, nil
+	return nil
 }
 
 func (b *FixtureBuilder) addRelation(target ModelRef, foreign ModelRef, connector Connector) error {

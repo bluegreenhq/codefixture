@@ -46,10 +46,15 @@ func TestFixtureBuilder_WithModel(t *testing.T) {
 
 func TestFixtureBuilder_AddRelation(t *testing.T) {
 	t.Run("add relation", func(t *testing.T) {
-		option := &codefixture.FixtureBuilderOption{
-			AllowEmptyWriter: true,
-		}
-		b := codefixture.NewFixtureBuilderWithOption(option)
+		b := codefixture.NewFixtureBuilder()
+		err := b.RegisterWriter(&Person{}, func(p any) (any, error) {
+			return p, nil
+		})
+		assert.NoError(t, err)
+		err = b.RegisterWriter(&Group{}, func(g any) (any, error) {
+			return g, nil
+		})
+		assert.NoError(t, err)
 
 		p, _ := b.AddModel(&Person{ID: 1})
 		g, _ := b.AddModel(&Group{ID: 2})
@@ -61,5 +66,36 @@ func TestFixtureBuilder_AddRelation(t *testing.T) {
 		f, err := b.Build()
 		assert.NoError(t, err)
 		assert.Equal(t, 2, f.GetModel(p).(*Person).GroupID)
+	})
+}
+
+func TestFixtureBuilder_Build(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		b := codefixture.NewFixtureBuilder()
+		err := b.RegisterWriter(&PersonMaterial{}, func(p any) (any, error) {
+			return &Person{
+				Name: p.(*PersonMaterial).Name,
+			}, nil
+		})
+		assert.NoError(t, err)
+		err = b.RegisterWriter(&Group{}, func(g any) (any, error) {
+			return g, nil
+		})
+		assert.NoError(t, err)
+
+		p, err := codefixture.ConvertAndAddModel[*PersonMaterial, *Person](b, nil)
+		assert.NoError(t, err)
+		g, err := codefixture.AddModel(b, func(g *Group) {
+			g.Name = "family"
+		})
+		assert.NoError(t, err)
+
+		err = codefixture.AddRelation(b, p, g, func(p *Person, g *Group) {
+			p.GroupID = g.ID
+		})
+		assert.NoError(t, err)
+
+		_, err = b.Build()
+		assert.NoError(t, err)
 	})
 }
