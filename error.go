@@ -22,6 +22,9 @@ type (
 		ExpectedType reflect.Type
 		ActualType   reflect.Type
 	}
+	WriterNotFoundError struct {
+		Type reflect.Type
+	}
 )
 
 func (e *NotPointerError) Error() string {
@@ -39,6 +42,9 @@ func (e *InvalidTypeError) Error() string {
 func (e *UnexpectedTypeError) Error() string {
 	return fmt.Sprintf("unexpected type: expected %v, actual %v", e.ExpectedType, e.ActualType)
 }
+func (e *WriterNotFoundError) Error() string {
+	return fmt.Sprintf("writer not found for type %v", e.Type)
+}
 
 func NewNotPointerError(t reflect.Type) error {
 	return &NotPointerError{Type: t}
@@ -54,4 +60,7 @@ func NewInvalidTypeError(target any) error {
 }
 func NewUnexpectedTypeError(expectedType reflect.Type, actualType reflect.Type) error {
 	return &UnexpectedTypeError{ExpectedType: expectedType, ActualType: actualType}
+}
+func NewWriterNotFoundError(t reflect.Type) error {
+	return &WriterNotFoundError{Type: t}
 }

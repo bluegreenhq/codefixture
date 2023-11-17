@@ -30,7 +30,10 @@ func TestFixtureBuilder_RegisterWriter(t *testing.T) {
 
 func TestFixtureBuilder_WithModel(t *testing.T) {
 	t.Run("add multiple models", func(t *testing.T) {
-		f, err := codefixture.NewFixtureBuilder().
+		option := &codefixture.FixtureBuilderOption{
+			AllowEmptyWriter: true,
+		}
+		f, err := codefixture.NewFixtureBuilderWithOption(option).
 			WithModel(&Person{Name: "john"}, "p1").
 			WithModel(&Group{Name: "family"}, "g1").
 			Build()
@@ -43,7 +46,10 @@ func TestFixtureBuilder_WithModel(t *testing.T) {
 
 func TestFixtureBuilder_AddRelation(t *testing.T) {
 	t.Run("add relation", func(t *testing.T) {
-		b := codefixture.NewFixtureBuilder()
+		option := &codefixture.FixtureBuilderOption{
+			AllowEmptyWriter: true,
+		}
+		b := codefixture.NewFixtureBuilderWithOption(option)
 
 		p, _ := b.AddModel(&Person{ID: 1})
 		g, _ := b.AddModel(&Group{ID: 2})

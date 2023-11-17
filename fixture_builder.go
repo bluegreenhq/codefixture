@@ -10,6 +10,10 @@ type FixtureBuilder struct {
 	writers      map[reflect.Type]Writer
 	models       map[ModelRef]any
 	relations    []ModelRelation
+	option       *FixtureBuilderOption
+}
+type FixtureBuilderOption struct {
+	AllowEmptyWriter bool
 }
 
 type Constructor func() any
@@ -21,6 +25,16 @@ func NewFixtureBuilder() *FixtureBuilder {
 		constructors: make(map[reflect.Type]Constructor),
 		writers:      make(map[reflect.Type]Writer),
 		models:       make(map[ModelRef]any),
+		option:       &FixtureBuilderOption{},
+	}
+}
+
+func NewFixtureBuilderWithOption(option *FixtureBuilderOption) *FixtureBuilder {
+	return &FixtureBuilder{
+		constructors: make(map[reflect.Type]Constructor),
+		writers:      make(map[reflect.Type]Writer),
+		models:       make(map[ModelRef]any),
+		option:       option,
 	}
 }
 
@@ -111,6 +125,10 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 				return nil, err
 			}
 			model = outModel
+		} else {
+			if !b.option.AllowEmptyWriter {
+				return nil, NewWriterNotFoundError(typ)
+			}
 		}
 
 		f.SetModel(ref, model)
