@@ -71,6 +71,14 @@ func (b *FixtureBuilder) AddRelation(target ModelRef, foreign ModelRef, connecto
 	return b.addRelation(target, foreign, connector)
 }
 
+func (b *FixtureBuilder) WithRelation(target ModelRef, foreign ModelRef, connector Connector) *FixtureBuilder {
+	err := b.addRelation(target, foreign, connector)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
 func (b *FixtureBuilder) GetModel(ref ModelRef) any {
 	return b.models[ref]
 }
