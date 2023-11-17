@@ -18,7 +18,17 @@ type Group struct {
 	Name string
 }
 
-func TestFixtureBuilder_WithMode(t *testing.T) {
+func TestFixtureBuilder_RegisterWriter(t *testing.T) {
+	t.Run("do nothing", func(t *testing.T) {
+		b := codefixture.NewFixtureBuilder()
+		err := b.RegisterWriter(&Person{}, func(p any) (any, error) {
+			return p, nil
+		})
+		assert.NoError(t, err)
+	})
+}
+
+func TestFixtureBuilder_WithModel(t *testing.T) {
 	t.Run("add multiple models", func(t *testing.T) {
 		f, err := codefixture.NewFixtureBuilder().
 			WithModel(&Person{Name: "john"}, "p1").
