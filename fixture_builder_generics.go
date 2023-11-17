@@ -46,6 +46,31 @@ func AddModel[T any](b *FixtureBuilder, setter func(T)) (TypedModelRef[T], error
 	return TypedModelRef[T](ref), err
 }
 
+func AddModelWithRelation[T, U any](b *FixtureBuilder, foreign TypedModelRef[U], connector func(T, U)) (TypedModelRef[T], error) {
+	ptrType := reflect.TypeOf((*T)(nil)).Elem()
+	if ptrType.Kind() != reflect.Ptr {
+		return "", NewNotPointerError(ptrType)
+	}
+
+	ref, err := b.addModel(ptrType, func(m any) {
+		t, ok := m.(T)
+		if !ok {
+			panic(NewInvalidTypeError(m))
+		}
+
+		u := GetBuilderModel(b, foreign)
+		if !ok {
+			panic(NewInvalidTypeError(u))
+		}
+
+		if connector != nil {
+			connector(t, u)
+		}
+	})
+
+	return TypedModelRef[T](ref), err
+}
+
 func ConvertAndAddModel[T, U any](b *FixtureBuilder, setter func(T)) (TypedModelRef[U], error) {
 	ptrType := reflect.TypeOf((*T)(nil)).Elem()
 	if ptrType.Kind() != reflect.Ptr {

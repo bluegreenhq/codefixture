@@ -83,7 +83,7 @@ func TestAddModel(t *testing.T) {
 }
 
 func TestConvertAndAddModel(t *testing.T) {
-	t.Run("", func(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
 		b := codefixture.NewFixtureBuilder()
 		err := codefixture.RegisterWriter(b, func(pm *PersonMaterial) (*Person, error) {
 			p := &Person{Name: pm.Name}
@@ -100,6 +100,39 @@ func TestConvertAndAddModel(t *testing.T) {
 
 		m := codefixture.GetModel[*Person](f, ref)
 		assert.Equal(t, "override", m.Name)
+	})
+}
+
+func TestAddModelWithRelation(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		b := codefixture.NewFixtureBuilder()
+		b.RegisterWriter(&Person{}, func(p any) (any, error) {
+			return p, nil
+		})
+		b.RegisterWriter(&Group{}, func(g any) (any, error) {
+			return g, nil
+		})
+		err := codefixture.RegisterConstructor(b, func() *Person {
+			return &Person{Name: "default"}
+		})
+		assert.NoError(t, err)
+
+		g, err := codefixture.AddModel(b, func(g *Group) {
+			g.ID = 1
+			g.Name = "family"
+		})
+		assert.NoError(t, err)
+
+		p, err := codefixture.AddModelWithRelation[*Person, *Group](b, g, func(p *Person, g *Group) {
+			p.GroupID = g.ID
+		})
+		assert.NoError(t, err)
+
+		f, err := b.Build()
+		assert.NoError(t, err)
+
+		m := codefixture.GetModel(f, p)
+		assert.Equal(t, 1, m.GroupID)
 	})
 }
 
