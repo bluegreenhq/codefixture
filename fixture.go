@@ -11,7 +11,11 @@ func NewFixture() *Fixture {
 }
 
 func (f *Fixture) GetModel(ref ModelRef) any {
-	return f.models[ref]
+	m, ok := f.models[ref]
+	if !ok {
+		panic(NewModelRefNotFoundError(ref))
+	}
+	return m
 }
 
 func (f *Fixture) SetModel(ref ModelRef, m any) {

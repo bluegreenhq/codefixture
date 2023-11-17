@@ -82,6 +82,11 @@ func TestFixtureBuilder_Build(t *testing.T) {
 			return g, nil
 		})
 		assert.NoError(t, err)
+		err = b.RegisterConverter(&PersonMaterial{}, func(p any) any {
+			return &Person{
+				Name: p.(*PersonMaterial).Name,
+			}
+		})
 
 		p, err := codefixture.ConvertAndAddModel[*PersonMaterial, *Person](b, nil)
 		assert.NoError(t, err)
