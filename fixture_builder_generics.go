@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-func RegisterWriter[T any, U any](b *FixtureBuilder, writer func(m T) (U, error)) error {
+func RegisterWriter[T, U any](b *FixtureBuilder, writer func(m T) (U, error)) error {
 	ptrType := reflect.TypeOf((*T)(nil)).Elem()
 
 	return b.registerWriter(ptrType, func(m any) (any, error) {
@@ -46,7 +46,27 @@ func AddModel[T any](b *FixtureBuilder, setter func(T)) (TypedModelRef[T], error
 	return TypedModelRef[T](ref), err
 }
 
-func AddRelation[T any, U any](b *FixtureBuilder, target TypedModelRef[T], foreign TypedModelRef[U], connector func(T, U)) error {
+func ConvertAndAddModel[T, U any](b *FixtureBuilder, setter func(T)) (TypedModelRef[U], error) {
+	ptrType := reflect.TypeOf((*T)(nil)).Elem()
+	if ptrType.Kind() != reflect.Ptr {
+		return "", NewNotPointerError(ptrType)
+	}
+
+	ref, err := b.addModel(ptrType, func(m any) {
+		t, ok := m.(T)
+		if !ok {
+			panic(NewInvalidTypeError(m))
+		}
+
+		if setter != nil {
+			setter(t)
+		}
+	})
+
+	return TypedModelRef[U](ref), err
+}
+
+func AddRelation[T, U any](b *FixtureBuilder, target TypedModelRef[T], foreign TypedModelRef[U], connector func(T, U)) error {
 	return b.addRelation(target.ModelRef(), foreign.ModelRef(), func(target, foreign any) {
 		t, ok := target.(T)
 		if !ok {

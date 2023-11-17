@@ -82,6 +82,27 @@ func TestAddModel(t *testing.T) {
 	})
 }
 
+func TestConvertAndAddModel(t *testing.T) {
+	t.Run("", func(t *testing.T) {
+		b := codefixture.NewFixtureBuilder()
+		err := codefixture.RegisterWriter(b, func(pm *PersonMaterial) (*Person, error) {
+			p := &Person{Name: pm.Name}
+			return p, nil
+		})
+
+		ref, err := codefixture.ConvertAndAddModel[*PersonMaterial, *Person](b, func(p *PersonMaterial) {
+			p.Name = "override"
+		})
+		assert.NoError(t, err)
+
+		f, err := b.Build()
+		assert.NoError(t, err)
+
+		m := codefixture.GetModel[*Person](f, ref)
+		assert.Equal(t, "override", m.Name)
+	})
+}
+
 func TestGetBuilderModel(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		b := codefixture.NewFixtureBuilder()

@@ -15,8 +15,12 @@ type (
 	ModelRefNotFoundError struct {
 		Ref ModelRef
 	}
-	InvalidType struct {
+	InvalidTypeError struct {
 		Target any
+	}
+	UnexpectedTypeError struct {
+		ExpectedType reflect.Type
+		ActualType   reflect.Type
 	}
 )
 
@@ -29,8 +33,11 @@ func (e *NotStructError) Error() string {
 func (e *ModelRefNotFoundError) Error() string {
 	return fmt.Sprintf("model ref %v not found", e.Ref)
 }
-func (e *InvalidType) Error() string {
+func (e *InvalidTypeError) Error() string {
 	return fmt.Sprintf("invalid type: %T", e.Target)
+}
+func (e *UnexpectedTypeError) Error() string {
+	return fmt.Sprintf("unexpected type: expected %v, actual %v", e.ExpectedType, e.ActualType)
 }
 
 func NewNotPointerError(t reflect.Type) error {
@@ -43,5 +50,8 @@ func NewModelRefNotFoundError(ref ModelRef) error {
 	return &ModelRefNotFoundError{Ref: ref}
 }
 func NewInvalidTypeError(target any) error {
-	return &InvalidType{Target: target}
+	return &InvalidTypeError{Target: target}
+}
+func NewUnexpectedTypeError(expectedType reflect.Type, actualType reflect.Type) error {
+	return &UnexpectedTypeError{ExpectedType: expectedType, ActualType: actualType}
 }
