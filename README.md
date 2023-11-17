@@ -19,7 +19,7 @@ codefixture is useful when you want to conduct tests in the following scenarios:
 ## Installation
 
 ```bash
-go install github.com/bluegreenhq/codefixture
+go get github.com/bluegreenhq/codefixture
 ```
 
 ## Usage

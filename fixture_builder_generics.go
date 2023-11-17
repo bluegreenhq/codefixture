@@ -5,7 +5,7 @@ import (
 	"reflect"
 )
 
-func RegisterWriter[T any](b *FixtureBuilder, writer func(m T) (T, error)) error {
+func RegisterWriter[T any, U any](b *FixtureBuilder, writer func(m T) (U, error)) error {
 	ptrType := reflect.TypeOf((*T)(nil)).Elem()
 
 	return b.registerWriter(ptrType, func(m any) (any, error) {

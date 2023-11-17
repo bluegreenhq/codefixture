@@ -7,6 +7,28 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type PersonMaterial struct {
+	Name string
+}
+
+func TestRegisterWriter(t *testing.T) {
+	t.Run("in and out are same type", func(t *testing.T) {
+		b := codefixture.NewFixtureBuilder()
+		err := codefixture.RegisterWriter(b, func(p *Person) (*Person, error) {
+			return p, nil
+		})
+		assert.NoError(t, err)
+	})
+	t.Run("in and out are different type", func(t *testing.T) {
+		b := codefixture.NewFixtureBuilder()
+		err := codefixture.RegisterWriter(b, func(pm *PersonMaterial) (*Person, error) {
+			p := &Person{Name: pm.Name}
+			return p, nil
+		})
+		assert.NoError(t, err)
+	})
+}
+
 func TestRegisterConstructor(t *testing.T) {
 	t.Run("set default value", func(t *testing.T) {
 		b := codefixture.NewFixtureBuilder()
