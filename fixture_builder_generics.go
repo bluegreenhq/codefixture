@@ -11,6 +11,10 @@ func NewTypedModelRef[T any]() TypedModelRef[T] {
 	return TypedModelRef[T](NewModelRef())
 }
 
+func (r TypedModelRef[T]) ModelRef() ModelRef {
+	return ModelRef(r)
+}
+
 func RegisterWriter[T any, U any](b *FixtureBuilder, writer func(m T) (U, error)) error {
 	ptrType := reflect.TypeOf((*T)(nil)).Elem()
 
