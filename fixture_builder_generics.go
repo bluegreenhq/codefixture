@@ -5,16 +5,6 @@ import (
 	"reflect"
 )
 
-type TypedModelRef[T any] ModelRef
-
-func NewTypedModelRef[T any]() TypedModelRef[T] {
-	return TypedModelRef[T](NewModelRef())
-}
-
-func (r TypedModelRef[T]) ModelRef() ModelRef {
-	return ModelRef(r)
-}
-
 func RegisterWriter[T any, U any](b *FixtureBuilder, writer func(m T) (U, error)) error {
 	ptrType := reflect.TypeOf((*T)(nil)).Elem()
 
@@ -57,7 +47,7 @@ func AddModel[T any](b *FixtureBuilder, setter func(T)) (TypedModelRef[T], error
 }
 
 func AddRelation[T any, U any](b *FixtureBuilder, target TypedModelRef[T], foreign TypedModelRef[U], connector func(T, U)) error {
-	return b.addRelation(ModelRef(target), ModelRef(foreign), func(target, foreign any) {
+	return b.addRelation(target.ModelRef(), foreign.ModelRef(), func(target, foreign any) {
 		t, ok := target.(T)
 		if !ok {
 			panic(NewInvalidTypeError(target))
@@ -74,7 +64,7 @@ func AddRelation[T any, U any](b *FixtureBuilder, target TypedModelRef[T], forei
 }
 
 func GetBuilderModel[T any](b *FixtureBuilder, ref TypedModelRef[T]) T {
-	m := b.models[ModelRef(ref)]
+	m := b.models[ref.ModelRef()]
 
 	t, ok := m.(T)
 	if !ok {

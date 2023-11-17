@@ -1,7 +1,7 @@
 package codefixture
 
-func GetModel[T any](f *Fixture, ref ModelRef) T {
-	m := f.models[ref]
+func GetModel[T any](f *Fixture, ref TypedModelRef[T]) T {
+	m := f.models[ref.ModelRef()]
 
 	t, ok := m.(T)
 	if !ok {
