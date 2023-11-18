@@ -176,6 +176,7 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 		if outType != inType {
 			outRef := NewModelRef()
 			b.converted[ref] = outRef
+			f.SetModel(outRef, model)
 		}
 	}
 
