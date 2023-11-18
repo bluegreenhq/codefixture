@@ -50,7 +50,7 @@ func AddModel[T any](b *FixtureBuilder, setter func(T)) (TypedModelRef[T], error
 	return ref, nil
 }
 
-func AddModelWithRelation[T, U any](b *FixtureBuilder, foreign TypedModelRef[U], connector func(T, U)) (TypedModelRef[T], error) {
+func AddModelWithRelation[T, U any](b *FixtureBuilder, foreign TypedModelRef[U], connector func(any, any)) (TypedModelRef[T], error) {
 	ptrType := reflect.TypeOf((*T)(nil)).Elem()
 	if ptrType.Kind() != reflect.Ptr {
 		return "", NewNotPointerError(ptrType)
@@ -93,7 +93,7 @@ func ConvertAndAddModel[T, U any](b *FixtureBuilder, setter func(T)) (TypedModel
 	return ref, nil
 }
 
-func AddRelation[T, U any](b *FixtureBuilder, target TypedModelRef[T], foreign TypedModelRef[U], connector func(T, U)) error {
+func AddRelation[T, U any](b *FixtureBuilder, target TypedModelRef[T], foreign TypedModelRef[U], connector func(any, any)) error {
 	return b.addRelation(target.ModelRef(), foreign.ModelRef(), func(target, foreign any) {
 		t, ok := target.(T)
 		if !ok {
@@ -103,7 +103,9 @@ func AddRelation[T, U any](b *FixtureBuilder, target TypedModelRef[T], foreign T
 		}
 		u, ok := foreign.(U)
 		if !ok {
-			panic(NewInvalidTypeError(foreign))
+			expectedType := reflect.TypeOf((*U)(nil)).Elem()
+			actualType := reflect.TypeOf(foreign)
+			panic(NewUnexpectedTypeError(expectedType, actualType))
 		}
 
 		if connector != nil {
@@ -113,7 +115,7 @@ func AddRelation[T, U any](b *FixtureBuilder, target TypedModelRef[T], foreign T
 }
 
 func GetBuilderModel[T any](b *FixtureBuilder, ref TypedModelRef[T]) T {
-	m := b.models[ref.ModelRef()]
+	m := b.GetBuilderModel(ref.ModelRef())
 
 	t, ok := m.(T)
 	if !ok {

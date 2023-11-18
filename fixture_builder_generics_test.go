@@ -125,8 +125,8 @@ func TestAddModelWithRelation(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		p, err := codefixture.AddModelWithRelation[*Person, *Group](b, g, func(p *Person, g *Group) {
-			p.GroupID = g.ID
+		p, err := codefixture.AddModelWithRelation[*Person, *Group](b, g, func(p any, g any) {
+			p.(*Person).GroupID = g.(*Group).ID
 		})
 		assert.NoError(t, err)
 
@@ -135,6 +135,26 @@ func TestAddModelWithRelation(t *testing.T) {
 
 		m := codefixture.GetModel[*Person](f, p.ModelRef())
 		assert.Equal(t, 1, m.GroupID)
+	})
+	t.Run("convert model", func(t *testing.T) {
+		b := codefixture.NewFixtureBuilder()
+		b.RegisterWriter(&PersonMaterial{}, func(p any) (any, error) {
+			return &Person{}, nil
+		})
+		b.RegisterWriter(&Group{}, func(g any) (any, error) {
+			return g, nil
+		})
+
+		p, err := codefixture.AddModel(b, func(p *PersonMaterial) {
+			p.Name = "john"
+		})
+		assert.NoError(t, err)
+		g, err := codefixture.AddModelWithRelation[*Group, *PersonMaterial](b, p, func(g any, p any) {
+			g.(*Group).CreatorID = p.(*Person).ID
+		})
+		assert.NoError(t, err)
+		group := codefixture.GetBuilderModel[*Group](b, g)
+		assert.Equal(t, 0, group.CreatorID)
 	})
 }
 

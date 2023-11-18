@@ -1,5 +1,7 @@
 package codefixture
 
+import "log"
+
 type Fixture struct {
 	models map[ModelRef]any
 }
@@ -19,5 +21,6 @@ func (f *Fixture) GetModel(ref ModelRef) any {
 }
 
 func (f *Fixture) SetModel(ref ModelRef, m any) {
+	log.Printf("Fixture.SetModel model=%T", m)
 	f.models[ref] = m
 }

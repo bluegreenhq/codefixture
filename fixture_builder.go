@@ -1,6 +1,7 @@
 package codefixture
 
 import (
+	"log"
 	"reflect"
 	"sort"
 )
@@ -60,7 +61,7 @@ func (b *FixtureBuilder) AddModel(m any) (ModelRef, error) {
 	}
 
 	ref := NewModelRef()
-	b.models[ref] = m
+	b.SetBuilderModel(ref, m)
 	return ref, nil
 }
 
@@ -71,7 +72,7 @@ func (b *FixtureBuilder) WithModel(m any, ref ModelRef) *FixtureBuilder {
 		panic(err)
 	}
 
-	b.models[ref] = m
+	b.SetBuilderModel(ref, m)
 	return b
 }
 
@@ -106,7 +107,24 @@ func (b *FixtureBuilder) GetBuilderModel(ref ModelRef) any {
 	return b.models[ref]
 }
 
+func (b *FixtureBuilder) SetBuilderModel(ref ModelRef, m any) {
+	b.models[ref] = m
+}
+
+func (b *FixtureBuilder) GetBuilderModelResolvingConverted(ref ModelRef) any {
+	return b.GetBuilderModel(b.GetModelRefResolvingConverted(ref))
+}
+
+func (b *FixtureBuilder) GetModelRefResolvingConverted(ref ModelRef) ModelRef {
+	if convertedRef, ok := b.converted[ref]; ok {
+		return convertedRef
+	}
+	return ref
+}
+
 func (b *FixtureBuilder) Build() (*Fixture, error) {
+	log.Println("FixtureBuilder.Build begin")
+
 	f := NewFixture()
 	refs, inModels := b.getModelsOrderedByRelations()
 
@@ -116,32 +134,9 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 		inType := reflect.TypeOf(inModel)
 		writer := b.writers[inType]
 
-		var model = inModel
-
-		for _, relation := range b.relations {
-			var targetRef = relation.TargetRef
-			if convertedRef, ok := b.converted[targetRef]; ok {
-				targetRef = convertedRef
-			}
-
-			if targetRef != ref {
-				continue
-			}
-			var targetModel = model
-			if convertedRef, ok := b.converted[ref]; ok {
-				targetModel = f.GetModel(convertedRef)
-			}
-
-			var foreignModel any
-			if convertedRef, ok := b.converted[relation.ForeignRef]; ok {
-				foreignModel = f.GetModel(convertedRef)
-			} else {
-				foreignModel = f.GetModel(relation.ForeignRef)
-			}
-			if foreignModel == nil {
-				return nil, NewModelRefNotFoundError(relation.ForeignRef)
-			}
-			relation.Connector(targetModel, foreignModel)
+		model, err := b.resolveRelations(ref, inModel, f)
+		if err != nil {
+			return nil, err
 		}
 
 		if writer != nil {
@@ -165,6 +160,7 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 		}
 	}
 
+	log.Println("FixtureBuilder.Build end")
 	return f, nil
 }
 
@@ -204,16 +200,16 @@ func (b *FixtureBuilder) addModel(ptrType reflect.Type, ref ModelRef, setter Set
 		setter(m)
 	}
 
-	b.models[ref] = m
+	b.SetBuilderModel(ref, m)
 	return nil
 }
 
 func (b *FixtureBuilder) addRelation(target ModelRef, foreign ModelRef, connector Connector) error {
-	targetModel := b.GetBuilderModel(target)
+	targetModel := b.GetBuilderModelResolvingConverted(target)
 	if targetModel == nil {
 		return NewModelRefNotFoundError(target)
 	}
-	foreignModel := b.GetBuilderModel(foreign)
+	foreignModel := b.GetBuilderModelResolvingConverted(foreign)
 	if foreignModel == nil {
 		return NewModelRefNotFoundError(foreign)
 	}
@@ -224,6 +220,29 @@ func (b *FixtureBuilder) addRelation(target ModelRef, foreign ModelRef, connecto
 		Connector:  connector,
 	})
 	return nil
+}
+
+func (b *FixtureBuilder) resolveRelations(ref ModelRef, model any, f *Fixture) (any, error) {
+	log.Printf("FixtureBuilder.resolveRelations model=%T", model)
+	var targetModel = model
+
+	for _, relation := range b.relations {
+		targetRef := b.GetModelRefResolvingConverted(relation.TargetRef)
+
+		if targetRef != ref {
+			continue
+		}
+
+		targetModel = b.GetBuilderModelResolvingConverted(ref)
+		foreignModel := f.GetModel(b.GetModelRefResolvingConverted(relation.ForeignRef))
+		if foreignModel == nil {
+			return nil, NewModelRefNotFoundError(relation.ForeignRef)
+		}
+		log.Printf("FixtureBuilder.resolveRelations target=%T, foreign=%T\n", targetModel, foreignModel)
+		relation.Connector(targetModel, foreignModel)
+	}
+
+	return targetModel, nil
 }
 
 // getModelsOrderedByRelations returns a slice of ModelRef and a slice of models

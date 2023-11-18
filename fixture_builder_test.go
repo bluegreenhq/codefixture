@@ -99,8 +99,8 @@ func TestFixtureBuilder_Build(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		err = codefixture.AddRelation(b, p, g, func(p *PersonMaterial, g *Group) {
-			p.GroupID = g.ID
+		err = codefixture.AddRelation[*PersonMaterial, *Group](b, p, g, func(p any, g any) {
+			p.(*PersonMaterial).GroupID = g.(*Group).ID
 		})
 		assert.NoError(t, err)
 
