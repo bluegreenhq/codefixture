@@ -1,6 +1,7 @@
 package codefixture_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/bluegreenhq/codefixture"
@@ -22,6 +23,39 @@ type Group struct {
 	ID        int
 	CreatorID int
 	Name      string
+}
+
+func TestFixtureBuilder_ReadmeScenario(t *testing.T) {
+	// 1. Import codefixture in your test file.
+	// 2. Create a `FixtureBuilder`.
+	builder := codefixture.NewFixtureBuilder()
+
+	// 3. Register writers with `FixtureBuilder`.
+	err := builder.RegisterWriter(&Person{}, func(m any) (any, error) {
+		return m, nil
+	})
+	assert.NoError(t, err)
+	err = builder.RegisterWriter(&Group{}, func(m any) (any, error) {
+		return m, nil
+	})
+	assert.NoError(t, err)
+
+	// 4. Add models and relations to `FixtureBuilder`.
+	p, _ := builder.AddModel(&Person{Name: "John"})
+	g, _ := builder.AddModel(&Group{Name: "Family"})
+
+	builder.AddRelation(p, g, func(p, g any) {
+		p.(*Person).GroupID = g.(*Group).ID
+	})
+
+	// 5. Build `Fixture` from `FixtureBuilder`.
+
+	fixture, err := builder.Build()
+	assert.NoError(t, err)
+
+	// 6. Access your models from `Fixture`.
+	fmt.Printf("Person name: %s\n", fixture.GetModel(p).(*Person).Name)
+	fmt.Printf("Group name: %s\n", fixture.GetModel(g).(*Group).Name)
 }
 
 func TestFixtureBuilder_RegisterWriter(t *testing.T) {
