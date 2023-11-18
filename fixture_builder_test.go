@@ -75,7 +75,7 @@ func TestFixtureBuilder_AddRelation(t *testing.T) {
 	})
 }
 
-func TestFixtureBuilder_AddModelWithRelation(t *testing.T) {
+func TestFixtureBuilder_AddModelAndRelation(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		b := codefixture.NewFixtureBuilder()
 		b.RegisterWriter(&Person{}, func(p any) (any, error) {
@@ -95,7 +95,7 @@ func TestFixtureBuilder_AddModelWithRelation(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		p, err := b.AddModelWithRelation(&Person{}, g, func(p any, g any) {
+		p, err := b.AddModelAndRelation(&Person{}, g, func(p any, g any) {
 			p.(*Person).GroupID = g.(*Group).ID
 		})
 		assert.NoError(t, err)
@@ -117,7 +117,7 @@ func TestFixtureBuilder_AddModelWithRelation(t *testing.T) {
 
 		p, err := b.AddModel(&PersonMaterial{Name: "john"})
 		assert.NoError(t, err)
-		g, err := b.AddModelWithRelation(&Group{}, p, func(g any, p any) {
+		g, err := b.AddModelAndRelation(&Group{}, p, func(g any, p any) {
 			g.(*Group).CreatorID = p.(*Person).ID
 		})
 		assert.NoError(t, err)

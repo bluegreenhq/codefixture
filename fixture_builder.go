@@ -80,7 +80,7 @@ func (b *FixtureBuilder) AddModelBySetter(typeInstance any, setter Setter) (Mode
 	return ref, nil
 }
 
-func (b *FixtureBuilder) AddModelWithRelation(m any, foreign ModelRef, connector func(any, any)) (ModelRef, error) {
+func (b *FixtureBuilder) AddModelAndRelation(m any, foreign ModelRef, connector func(any, any)) (ModelRef, error) {
 	ptrType := reflect.TypeOf(m)
 	if ptrType.Kind() != reflect.Ptr {
 		return "", NewNotPointerError(ptrType)
@@ -122,7 +122,7 @@ func (b *FixtureBuilder) WithRelation(target ModelRef, foreign ModelRef, connect
 	return b
 }
 
-func (b *FixtureBuilder) WithModelWithRelation(m any, target ModelRef, foreign ModelRef, connector func(any, any)) *FixtureBuilder {
+func (b *FixtureBuilder) WithModelAndRelation(m any, target ModelRef, foreign ModelRef, connector func(any, any)) *FixtureBuilder {
 	ptrType := reflect.TypeOf(m)
 	if ptrType.Kind() != reflect.Ptr {
 		panic(NewNotPointerError(ptrType))
