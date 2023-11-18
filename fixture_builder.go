@@ -7,9 +7,9 @@ import (
 
 type FixtureBuilder struct {
 	constructors map[reflect.Type]Constructor
-	converters   map[reflect.Type]Converter
 	writers      map[reflect.Type]Writer
 	models       map[ModelRef]any
+	converted    map[ModelRef]ModelRef
 	relations    []ModelRelation
 	option       *FixtureBuilderOption
 }
@@ -19,15 +19,14 @@ type FixtureBuilderOption struct {
 
 type Constructor func() any
 type Setter func(any)
-type Converter func(any) any
 type Writer func(m any) (any, error)
 
 func NewFixtureBuilder() *FixtureBuilder {
 	return &FixtureBuilder{
 		constructors: make(map[reflect.Type]Constructor),
-		converters:   make(map[reflect.Type]Converter),
 		writers:      make(map[reflect.Type]Writer),
 		models:       make(map[ModelRef]any),
+		converted:    make(map[ModelRef]ModelRef),
 		option:       &FixtureBuilderOption{},
 	}
 }
@@ -35,9 +34,9 @@ func NewFixtureBuilder() *FixtureBuilder {
 func NewFixtureBuilderWithOption(option *FixtureBuilderOption) *FixtureBuilder {
 	return &FixtureBuilder{
 		constructors: make(map[reflect.Type]Constructor),
-		converters:   make(map[reflect.Type]Converter),
 		writers:      make(map[reflect.Type]Writer),
 		models:       make(map[ModelRef]any),
+		converted:    make(map[ModelRef]ModelRef),
 		option:       option,
 	}
 }
@@ -46,12 +45,6 @@ func (b *FixtureBuilder) RegisterWriter(typeInstance any, writer Writer) error {
 	ptrType := reflect.TypeOf(typeInstance)
 
 	return b.registerWriter(ptrType, writer)
-}
-
-func (b *FixtureBuilder) RegisterConverter(typeInstance any, converter Converter) error {
-	ptrType := reflect.TypeOf(typeInstance)
-
-	return b.registerConverter(ptrType, converter)
 }
 
 func (b *FixtureBuilder) RegisterConstructor(typeInstance any, constructor Constructor) error {
@@ -120,39 +113,56 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 	for i, ref := range refs {
 		inModel := inModels[i]
 
-		typ := reflect.TypeOf(inModel)
-		writer := b.writers[typ]
-		converter := b.converters[typ]
+		inType := reflect.TypeOf(inModel)
+		writer := b.writers[inType]
 
-		model := inModel
-		if converter != nil {
-			model = converter(inModel)
-		}
+		var model = inModel
 
 		for _, relation := range b.relations {
-			if relation.TargetRef != ref {
+			var targetRef = relation.TargetRef
+			if convertedRef, ok := b.converted[targetRef]; ok {
+				targetRef = convertedRef
+			}
+
+			if targetRef != ref {
 				continue
 			}
-			foreignModel := f.GetModel(relation.ForeignRef)
+			var targetModel = model
+			if convertedRef, ok := b.converted[ref]; ok {
+				targetModel = f.GetModel(convertedRef)
+			}
+
+			var foreignModel any
+			if convertedRef, ok := b.converted[relation.ForeignRef]; ok {
+				foreignModel = f.GetModel(convertedRef)
+			} else {
+				foreignModel = f.GetModel(relation.ForeignRef)
+			}
 			if foreignModel == nil {
 				return nil, NewModelRefNotFoundError(relation.ForeignRef)
 			}
-			relation.Connector(model, foreignModel)
+			relation.Connector(targetModel, foreignModel)
 		}
 
 		if writer != nil {
-			outModel, err := writer(inModel)
+			outModel, err := writer(model)
 			if err != nil {
 				return nil, err
 			}
 			model = outModel
 		} else {
 			if !b.option.AllowEmptyWriter {
-				return nil, NewWriterNotFoundError(typ)
+				return nil, NewWriterNotFoundError(inType)
 			}
 		}
 
 		f.SetModel(ref, model)
+
+		outType := reflect.TypeOf(model)
+		if outType != inType {
+			outRef := NewModelRef()
+			b.converted[ref] = outRef
+		}
 	}
 
 	return f, nil
@@ -164,15 +174,6 @@ func (b *FixtureBuilder) registerWriter(ptrType reflect.Type, writer Writer) err
 	}
 
 	b.writers[ptrType] = writer
-	return nil
-}
-
-func (b *FixtureBuilder) registerConverter(ptrType reflect.Type, converter Converter) error {
-	if ptrType.Kind() != reflect.Ptr {
-		return NewNotPointerError(ptrType)
-	}
-
-	b.converters[ptrType] = converter
 	return nil
 }
 

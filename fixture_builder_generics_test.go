@@ -8,7 +8,8 @@ import (
 )
 
 type PersonMaterial struct {
-	Name string
+	Name    string
+	GroupID int
 }
 
 func TestRegisterWriter(t *testing.T) {
@@ -89,6 +90,7 @@ func TestConvertAndAddModel(t *testing.T) {
 			p := &Person{Name: pm.Name}
 			return p, nil
 		})
+		assert.NoError(t, err)
 
 		ref, err := codefixture.ConvertAndAddModel[*PersonMaterial, *Person](b, func(p *PersonMaterial) {
 			p.Name = "override"
@@ -98,7 +100,7 @@ func TestConvertAndAddModel(t *testing.T) {
 		f, err := b.Build()
 		assert.NoError(t, err)
 
-		m := codefixture.GetModel[*Person](f, ref)
+		m := codefixture.GetModel[*Person](f, ref.ModelRef())
 		assert.Equal(t, "override", m.Name)
 	})
 }
@@ -131,7 +133,7 @@ func TestAddModelWithRelation(t *testing.T) {
 		f, err := b.Build()
 		assert.NoError(t, err)
 
-		m := codefixture.GetModel(f, p)
+		m := codefixture.GetModel[*Person](f, p.ModelRef())
 		assert.Equal(t, 1, m.GroupID)
 	})
 }

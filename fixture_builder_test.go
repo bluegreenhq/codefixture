@@ -14,8 +14,9 @@ type Person struct {
 }
 
 type Group struct {
-	ID   int
-	Name string
+	ID        int
+	CreatorID int
+	Name      string
 }
 
 func TestFixtureBuilder_RegisterWriter(t *testing.T) {
@@ -82,25 +83,33 @@ func TestFixtureBuilder_Build(t *testing.T) {
 			return g, nil
 		})
 		assert.NoError(t, err)
-		err = b.RegisterConverter(&PersonMaterial{}, func(p any) any {
-			return &Person{
-				Name: p.(*PersonMaterial).Name,
-			}
-		})
 
-		p, err := codefixture.ConvertAndAddModel[*PersonMaterial, *Person](b, nil)
+		p, err := codefixture.ConvertAndAddModel[*PersonMaterial, *Person](b, func(pm *PersonMaterial) {
+			pm.Name = "john"
+		})
 		assert.NoError(t, err)
+
+		{
+			person := codefixture.GetBuilderModel[*PersonMaterial](b, p)
+			assert.Equal(t, "john", person.Name)
+		}
+
 		g, err := codefixture.AddModel(b, func(g *Group) {
 			g.Name = "family"
 		})
 		assert.NoError(t, err)
 
-		err = codefixture.AddRelation(b, p, g, func(p *Person, g *Group) {
+		err = codefixture.AddRelation(b, p, g, func(p *PersonMaterial, g *Group) {
 			p.GroupID = g.ID
 		})
 		assert.NoError(t, err)
 
-		_, err = b.Build()
+		fixture, err := b.Build()
 		assert.NoError(t, err)
+
+		{
+			person := codefixture.GetModel[*Person](fixture, p.ModelRef())
+			assert.Equal(t, "john", person.Name)
+		}
 	})
 }

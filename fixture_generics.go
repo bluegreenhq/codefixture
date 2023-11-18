@@ -1,9 +1,9 @@
 package codefixture
 
-func GetModel[T any](f *Fixture, ref TypedModelRef[T]) T {
-	m, ok := f.models[ref.ModelRef()]
+func GetModel[T any](f *Fixture, ref ModelRef) T {
+	m, ok := f.models[ref]
 	if !ok {
-		panic(NewModelRefNotFoundError(ref.ModelRef()))
+		panic(NewModelRefNotFoundError(ref))
 	}
 
 	t, ok := m.(T)
