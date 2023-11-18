@@ -91,6 +91,25 @@ func (b *FixtureBuilder) AddModelBySetter(typeInstance any, setter Setter) (Mode
 	return ref, nil
 }
 
+func (b *FixtureBuilder) AddModelWithRelation(m any, foreign ModelRef, connector func(any, any)) (ModelRef, error) {
+	ptrType := reflect.TypeOf(m)
+	if ptrType.Kind() != reflect.Ptr {
+		return "", NewNotPointerError(ptrType)
+	}
+
+	target, err := b.AddModel(m)
+	if err != nil {
+		return "", err
+	}
+
+	err = b.AddRelation(target, foreign, connector)
+	if err != nil {
+		return "", err
+	}
+
+	return target, nil
+}
+
 func (b *FixtureBuilder) AddRelation(target ModelRef, foreign ModelRef, connector Connector) error {
 	return b.addRelation(target, foreign, connector)
 }

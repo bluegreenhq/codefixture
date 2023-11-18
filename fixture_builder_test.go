@@ -70,6 +70,57 @@ func TestFixtureBuilder_AddRelation(t *testing.T) {
 	})
 }
 
+func TestFixtureBuilder_AddModelWithRelation(t *testing.T) {
+	t.Run("happy path", func(t *testing.T) {
+		b := codefixture.NewFixtureBuilder()
+		b.RegisterWriter(&Person{}, func(p any) (any, error) {
+			return p, nil
+		})
+		b.RegisterWriter(&Group{}, func(g any) (any, error) {
+			return g, nil
+		})
+		err := codefixture.RegisterConstructor(b, func() *Person {
+			return &Person{Name: "default"}
+		})
+		assert.NoError(t, err)
+
+		g, err := b.AddModelBySetter(&Group{}, func(g any) {
+			g.(*Group).ID = 1
+			g.(*Group).Name = "family"
+		})
+		assert.NoError(t, err)
+
+		p, err := b.AddModelWithRelation(&Person{}, g, func(p any, g any) {
+			p.(*Person).GroupID = g.(*Group).ID
+		})
+		assert.NoError(t, err)
+
+		f, err := b.Build()
+		assert.NoError(t, err)
+
+		m := f.GetModel(p)
+		assert.Equal(t, 1, m.(*Person).GroupID)
+	})
+	t.Run("convert model", func(t *testing.T) {
+		b := codefixture.NewFixtureBuilder()
+		b.RegisterWriter(&PersonMaterial{}, func(p any) (any, error) {
+			return &Person{}, nil
+		})
+		b.RegisterWriter(&Group{}, func(g any) (any, error) {
+			return g, nil
+		})
+
+		p, err := b.AddModel(&PersonMaterial{Name: "john"})
+		assert.NoError(t, err)
+		g, err := b.AddModelWithRelation(&Group{}, p, func(g any, p any) {
+			g.(*Group).CreatorID = p.(*Person).ID
+		})
+		assert.NoError(t, err)
+		group := b.GetBuilderModel(g)
+		assert.Equal(t, 0, group.(*Group).CreatorID)
+	})
+}
+
 func TestFixtureBuilder_Build(t *testing.T) {
 	t.Run("happy path", func(t *testing.T) {
 		b := codefixture.NewFixtureBuilder()
