@@ -65,17 +65,6 @@ func (b *FixtureBuilder) AddModel(m any) (ModelRef, error) {
 	return ref, nil
 }
 
-func (b *FixtureBuilder) WithModel(m any, ref ModelRef) *FixtureBuilder {
-	ptrType := reflect.TypeOf(m)
-	if ptrType.Kind() != reflect.Ptr {
-		err := NewNotPointerError(ptrType)
-		panic(err)
-	}
-
-	b.SetBuilderModel(ref, m)
-	return b
-}
-
 func (b *FixtureBuilder) AddModelBySetter(typeInstance any, setter Setter) (ModelRef, error) {
 	ptrType := reflect.TypeOf(typeInstance)
 	if ptrType.Kind() != reflect.Ptr {
@@ -114,11 +103,41 @@ func (b *FixtureBuilder) AddRelation(target ModelRef, foreign ModelRef, connecto
 	return b.addRelation(target, foreign, connector)
 }
 
+func (b *FixtureBuilder) WithModel(m any, ref ModelRef) *FixtureBuilder {
+	ptrType := reflect.TypeOf(m)
+	if ptrType.Kind() != reflect.Ptr {
+		err := NewNotPointerError(ptrType)
+		panic(err)
+	}
+
+	b.SetBuilderModel(ref, m)
+	return b
+}
+
 func (b *FixtureBuilder) WithRelation(target ModelRef, foreign ModelRef, connector Connector) *FixtureBuilder {
 	err := b.addRelation(target, foreign, connector)
 	if err != nil {
 		panic(err)
 	}
+	return b
+}
+
+func (b *FixtureBuilder) WithModelWithRelation(m any, foreign ModelRef, connector func(any, any)) *FixtureBuilder {
+	ptrType := reflect.TypeOf(m)
+	if ptrType.Kind() != reflect.Ptr {
+		panic(NewNotPointerError(ptrType))
+	}
+
+	target, err := b.AddModel(m)
+	if err != nil {
+		panic(err)
+	}
+
+	err = b.AddRelation(target, foreign, connector)
+	if err != nil {
+		panic(err)
+	}
+
 	return b
 }
 
