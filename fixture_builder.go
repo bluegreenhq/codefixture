@@ -6,14 +6,34 @@ import (
 	"sort"
 )
 
-type FixtureBuilder struct {
+type FixtureBuilder interface {
+	RegisterConstructor(typeInstance any, constructor Constructor) error
+	RegisterWriter(typeInstance any, writer Writer) error
+	AddModel(m any) (ModelRef, error)
+	AddModelBySetter(typeInstance any, setter Setter) (ModelRef, error)
+	AddModelAndRelation(m any, foreign ModelRef, connector func(any, any)) (ModelRef, error)
+	AddRelation(target ModelRef, foreign ModelRef, connector Connector) error
+	WithModel(m any, ref ModelRef) FixtureBuilder
+	WithRelation(target ModelRef, foreign ModelRef, connector Connector) FixtureBuilder
+	WithModelAndRelation(m any, target ModelRef, foreign ModelRef, connector func(any, any)) FixtureBuilder
+	GetBuilderModel(ref ModelRef) any
+	SetBuilderModel(ref ModelRef, m any)
+	GetBuilderModelResolvingConverted(ref ModelRef) any
+	GetModelRefResolvingConverted(ref ModelRef) ModelRef
+	Build() (Fixture, error)
+}
+
+type fixtureBuilder struct {
 	constructors map[reflect.Type]Constructor
 	writers      map[reflect.Type]Writer
 	models       map[ModelRef]any
 	converted    map[ModelRef]ModelRef
 	relations    []ModelRelation
-	option       *FixtureBuilderOption
+	option       FixtureBuilderOption
 }
+
+var _ FixtureBuilder = (*fixtureBuilder)(nil)
+
 type FixtureBuilderOption struct {
 	AllowEmptyWriter bool
 }
@@ -22,18 +42,18 @@ type Constructor func() any
 type Setter func(any)
 type Writer func(m any) (any, error)
 
-func NewFixtureBuilder() *FixtureBuilder {
-	return &FixtureBuilder{
+func NewFixtureBuilder() FixtureBuilder {
+	return &fixtureBuilder{
 		constructors: make(map[reflect.Type]Constructor),
 		writers:      make(map[reflect.Type]Writer),
 		models:       make(map[ModelRef]any),
 		converted:    make(map[ModelRef]ModelRef),
-		option:       &FixtureBuilderOption{},
+		option:       FixtureBuilderOption{},
 	}
 }
 
-func NewFixtureBuilderWithOption(option *FixtureBuilderOption) *FixtureBuilder {
-	return &FixtureBuilder{
+func NewFixtureBuilderWithOption(option FixtureBuilderOption) FixtureBuilder {
+	return &fixtureBuilder{
 		constructors: make(map[reflect.Type]Constructor),
 		writers:      make(map[reflect.Type]Writer),
 		models:       make(map[ModelRef]any),
@@ -42,19 +62,19 @@ func NewFixtureBuilderWithOption(option *FixtureBuilderOption) *FixtureBuilder {
 	}
 }
 
-func (b *FixtureBuilder) RegisterWriter(typeInstance any, writer Writer) error {
+func (b *fixtureBuilder) RegisterWriter(typeInstance any, writer Writer) error {
 	ptrType := reflect.TypeOf(typeInstance)
 
 	return b.registerWriter(ptrType, writer)
 }
 
-func (b *FixtureBuilder) RegisterConstructor(typeInstance any, constructor Constructor) error {
+func (b *fixtureBuilder) RegisterConstructor(typeInstance any, constructor Constructor) error {
 	ptrType := reflect.TypeOf(typeInstance)
 
 	return b.registerConstructor(ptrType, constructor)
 }
 
-func (b *FixtureBuilder) AddModel(m any) (ModelRef, error) {
+func (b *fixtureBuilder) AddModel(m any) (ModelRef, error) {
 	ptrType := reflect.TypeOf(m)
 	if ptrType.Kind() != reflect.Ptr {
 		return "", NewNotPointerError(ptrType)
@@ -65,7 +85,7 @@ func (b *FixtureBuilder) AddModel(m any) (ModelRef, error) {
 	return ref, nil
 }
 
-func (b *FixtureBuilder) AddModelBySetter(typeInstance any, setter Setter) (ModelRef, error) {
+func (b *fixtureBuilder) AddModelBySetter(typeInstance any, setter Setter) (ModelRef, error) {
 	ptrType := reflect.TypeOf(typeInstance)
 	if ptrType.Kind() != reflect.Ptr {
 		return "", NewNotPointerError(ptrType)
@@ -80,7 +100,7 @@ func (b *FixtureBuilder) AddModelBySetter(typeInstance any, setter Setter) (Mode
 	return ref, nil
 }
 
-func (b *FixtureBuilder) AddModelAndRelation(m any, foreign ModelRef, connector func(any, any)) (ModelRef, error) {
+func (b *fixtureBuilder) AddModelAndRelation(m any, foreign ModelRef, connector func(any, any)) (ModelRef, error) {
 	ptrType := reflect.TypeOf(m)
 	if ptrType.Kind() != reflect.Ptr {
 		return "", NewNotPointerError(ptrType)
@@ -99,11 +119,11 @@ func (b *FixtureBuilder) AddModelAndRelation(m any, foreign ModelRef, connector 
 	return target, nil
 }
 
-func (b *FixtureBuilder) AddRelation(target ModelRef, foreign ModelRef, connector Connector) error {
+func (b *fixtureBuilder) AddRelation(target ModelRef, foreign ModelRef, connector Connector) error {
 	return b.addRelation(target, foreign, connector)
 }
 
-func (b *FixtureBuilder) WithModel(m any, ref ModelRef) *FixtureBuilder {
+func (b *fixtureBuilder) WithModel(m any, ref ModelRef) FixtureBuilder {
 	ptrType := reflect.TypeOf(m)
 	if ptrType.Kind() != reflect.Ptr {
 		err := NewNotPointerError(ptrType)
@@ -114,7 +134,7 @@ func (b *FixtureBuilder) WithModel(m any, ref ModelRef) *FixtureBuilder {
 	return b
 }
 
-func (b *FixtureBuilder) WithRelation(target ModelRef, foreign ModelRef, connector Connector) *FixtureBuilder {
+func (b *fixtureBuilder) WithRelation(target ModelRef, foreign ModelRef, connector Connector) FixtureBuilder {
 	err := b.addRelation(target, foreign, connector)
 	if err != nil {
 		panic(err)
@@ -122,7 +142,7 @@ func (b *FixtureBuilder) WithRelation(target ModelRef, foreign ModelRef, connect
 	return b
 }
 
-func (b *FixtureBuilder) WithModelAndRelation(m any, target ModelRef, foreign ModelRef, connector func(any, any)) *FixtureBuilder {
+func (b *fixtureBuilder) WithModelAndRelation(m any, target ModelRef, foreign ModelRef, connector func(any, any)) FixtureBuilder {
 	ptrType := reflect.TypeOf(m)
 	if ptrType.Kind() != reflect.Ptr {
 		panic(NewNotPointerError(ptrType))
@@ -138,26 +158,26 @@ func (b *FixtureBuilder) WithModelAndRelation(m any, target ModelRef, foreign Mo
 	return b
 }
 
-func (b *FixtureBuilder) GetBuilderModel(ref ModelRef) any {
+func (b *fixtureBuilder) GetBuilderModel(ref ModelRef) any {
 	return b.models[ref]
 }
 
-func (b *FixtureBuilder) SetBuilderModel(ref ModelRef, m any) {
+func (b *fixtureBuilder) SetBuilderModel(ref ModelRef, m any) {
 	b.models[ref] = m
 }
 
-func (b *FixtureBuilder) GetBuilderModelResolvingConverted(ref ModelRef) any {
+func (b *fixtureBuilder) GetBuilderModelResolvingConverted(ref ModelRef) any {
 	return b.GetBuilderModel(b.GetModelRefResolvingConverted(ref))
 }
 
-func (b *FixtureBuilder) GetModelRefResolvingConverted(ref ModelRef) ModelRef {
+func (b *fixtureBuilder) GetModelRefResolvingConverted(ref ModelRef) ModelRef {
 	if convertedRef, ok := b.converted[ref]; ok {
 		return convertedRef
 	}
 	return ref
 }
 
-func (b *FixtureBuilder) Build() (*Fixture, error) {
+func (b *fixtureBuilder) Build() (Fixture, error) {
 	log.Println("FixtureBuilder.Build begin")
 
 	f := NewFixture()
@@ -200,7 +220,7 @@ func (b *FixtureBuilder) Build() (*Fixture, error) {
 	return f, nil
 }
 
-func (b *FixtureBuilder) registerWriter(ptrType reflect.Type, writer Writer) error {
+func (b *fixtureBuilder) registerWriter(ptrType reflect.Type, writer Writer) error {
 	if ptrType.Kind() != reflect.Ptr {
 		return NewNotPointerError(ptrType)
 	}
@@ -209,7 +229,7 @@ func (b *FixtureBuilder) registerWriter(ptrType reflect.Type, writer Writer) err
 	return nil
 }
 
-func (b *FixtureBuilder) registerConstructor(ptrType reflect.Type, constructor Constructor) error {
+func (b *fixtureBuilder) registerConstructor(ptrType reflect.Type, constructor Constructor) error {
 	if ptrType.Kind() != reflect.Ptr {
 		return NewNotPointerError(ptrType)
 	}
@@ -218,7 +238,7 @@ func (b *FixtureBuilder) registerConstructor(ptrType reflect.Type, constructor C
 	return nil
 }
 
-func (b *FixtureBuilder) addModel(ptrType reflect.Type, ref ModelRef, setter Setter) error {
+func (b *fixtureBuilder) addModel(ptrType reflect.Type, ref ModelRef, setter Setter) error {
 	structType := ptrType.Elem()
 	if structType.Kind() != reflect.Struct {
 		return NewNotStructError(structType)
@@ -240,7 +260,7 @@ func (b *FixtureBuilder) addModel(ptrType reflect.Type, ref ModelRef, setter Set
 	return nil
 }
 
-func (b *FixtureBuilder) addRelation(target ModelRef, foreign ModelRef, connector Connector) error {
+func (b *fixtureBuilder) addRelation(target ModelRef, foreign ModelRef, connector Connector) error {
 	targetModel := b.GetBuilderModelResolvingConverted(target)
 	if targetModel == nil {
 		return NewModelRefNotFoundError(target)
@@ -258,7 +278,7 @@ func (b *FixtureBuilder) addRelation(target ModelRef, foreign ModelRef, connecto
 	return nil
 }
 
-func (b *FixtureBuilder) resolveRelations(ref ModelRef, model any, f *Fixture) (any, error) {
+func (b *fixtureBuilder) resolveRelations(ref ModelRef, model any, f Fixture) (any, error) {
 	log.Printf("FixtureBuilder.resolveRelations model=%T", model)
 	var targetModel = model
 
@@ -283,10 +303,10 @@ func (b *FixtureBuilder) resolveRelations(ref ModelRef, model any, f *Fixture) (
 
 // getModelsOrderedByRelations returns a slice of ModelRef and a slice of models
 // ordered based on their hierarchical depth as defined in Relations.
-func (ib *FixtureBuilder) getModelsOrderedByRelations() ([]ModelRef, []any) {
+func (b *fixtureBuilder) getModelsOrderedByRelations() ([]ModelRef, []any) {
 	// Initialize depths for each model in InModels
 	depths := make(map[ModelRef]int)
-	for ref := range ib.models {
+	for ref := range b.models {
 		depths[ref] = 0
 	}
 
@@ -294,7 +314,7 @@ func (ib *FixtureBuilder) getModelsOrderedByRelations() ([]ModelRef, []any) {
 	changed := true
 	for changed {
 		changed = false
-		for _, relation := range ib.relations {
+		for _, relation := range b.relations {
 			targetDepth := depths[relation.TargetRef]
 			foreignDepth := depths[relation.ForeignRef]
 
@@ -316,7 +336,7 @@ func (ib *FixtureBuilder) getModelsOrderedByRelations() ([]ModelRef, []any) {
 	}
 
 	var modelsWithDepth []modelWithDepth
-	for ref, m := range ib.models {
+	for ref, m := range b.models {
 		modelsWithDepth = append(modelsWithDepth, modelWithDepth{ref, depths[ref], m})
 	}
 

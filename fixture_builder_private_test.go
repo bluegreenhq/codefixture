@@ -8,7 +8,7 @@ import (
 
 func TestFixtureBuilder_getModelsOrderedByRelations(t *testing.T) {
 	t.Run("no relations", func(t *testing.T) {
-		b := NewFixtureBuilder()
+		b := NewFixtureBuilder().(*fixtureBuilder)
 		b.models["a"] = "a"
 		b.models["b"] = "b"
 
@@ -17,7 +17,7 @@ func TestFixtureBuilder_getModelsOrderedByRelations(t *testing.T) {
 		assert.Len(t, ms, 2)
 	})
 	t.Run("leaf should appear first", func(t *testing.T) {
-		b := NewFixtureBuilder()
+		b := NewFixtureBuilder().(*fixtureBuilder)
 		b.models["root"] = "root"
 		b.models["branch"] = "branch"
 		b.models["leaf"] = "leaf"
@@ -40,7 +40,7 @@ func TestFixtureBuilder_getModelsOrderedByRelations(t *testing.T) {
 		assert.Equal(t, "root", ms[2])
 	})
 	t.Run("delayed dependency resolution", func(t *testing.T) {
-		b := NewFixtureBuilder()
+		b := NewFixtureBuilder().(*fixtureBuilder)
 		b.models["d"] = "d"
 		b.models["c"] = "c"
 		b.models["b"] = "b"

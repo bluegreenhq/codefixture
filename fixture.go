@@ -2,17 +2,24 @@ package codefixture
 
 import "log"
 
-type Fixture struct {
+type Fixture interface {
+	GetModel(ref ModelRef) any
+	SetModel(ref ModelRef, m any)
+}
+
+type fixture struct {
 	models map[ModelRef]any
 }
 
-func NewFixture() *Fixture {
-	return &Fixture{
+var _ Fixture = (*fixture)(nil)
+
+func NewFixture() Fixture {
+	return &fixture{
 		models: make(map[ModelRef]any),
 	}
 }
 
-func (f *Fixture) GetModel(ref ModelRef) any {
+func (f *fixture) GetModel(ref ModelRef) any {
 	m, ok := f.models[ref]
 	if !ok {
 		panic(NewModelRefNotFoundError(ref))
@@ -20,7 +27,7 @@ func (f *Fixture) GetModel(ref ModelRef) any {
 	return m
 }
 
-func (f *Fixture) SetModel(ref ModelRef, m any) {
+func (f *fixture) SetModel(ref ModelRef, m any) {
 	log.Printf("Fixture.SetModel model=%T", m)
 	f.models[ref] = m
 }

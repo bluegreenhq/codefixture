@@ -70,7 +70,7 @@ func TestFixtureBuilder_RegisterWriter(t *testing.T) {
 
 func TestFixtureBuilder_WithModel(t *testing.T) {
 	t.Run("add multiple models", func(t *testing.T) {
-		option := &codefixture.FixtureBuilderOption{
+		option := codefixture.FixtureBuilderOption{
 			AllowEmptyWriter: true,
 		}
 		f, err := codefixture.NewFixtureBuilderWithOption(option).
